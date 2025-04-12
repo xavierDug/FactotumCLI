@@ -1,4 +1,4 @@
-# MyTool
+# Factotum CLI
 
 Personal Command Line Assistant Tool
 
