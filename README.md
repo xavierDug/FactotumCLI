@@ -6,3 +6,9 @@ Personal Command Line Assistant Tool
 
 ```bash
 pip install -e .
+```
+
+## Install CLI directly globally
+
+```bash
+pip install git+https://github.com/xavierDug/FactotumCLI.git
