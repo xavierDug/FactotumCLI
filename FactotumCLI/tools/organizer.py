@@ -4,7 +4,7 @@ from ..logger import log_task
 console = Console()
 
 # Function to organize files in a directory by their extensions
-def organize_files(directory):
+def organize_files(directory: str):
     """
     Organize files in a directory by their extensions.
 

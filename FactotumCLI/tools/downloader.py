@@ -4,7 +4,7 @@ from ..logger import log_task
 console = Console()
 
 # Function to download a webpage
-def download_webpage(url, output="downloaded_page.html"):
+def download_webpage(url: str, output: str = "downloaded_page.html"):
     """
     Download a webpage and save it locally.
 
@@ -21,18 +21,17 @@ def download_webpage(url, output="downloaded_page.html"):
     """
     
     import requests
-    from rich.progress import track
-
+    
     try:
-        for step in track(range(1), description="🌐 Downloading web page..."):
-            response = requests.get(url)
-            response.raise_for_status()
+        response = requests.get(url)
+        response.raise_for_status()
 
         with open(output, 'w', encoding='utf-8') as file:
             file.write(response.text)
 
         console.print(f"✅ Webpage downloaded successfully: {output}", style="bold green")
-        log_task(f"Webpage downloaded successfully: {output}")
+        log_task(f"Webpage downloaded: {url} -> {output}")
 
     except requests.RequestException as e:
+        console.print(f"❌ Error downloading webpage: {e}", style="bold red")
         log_task(f"Error downloading webpage: {e}")

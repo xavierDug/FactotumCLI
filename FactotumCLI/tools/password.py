@@ -4,7 +4,7 @@ from ..logger import log_task
 console = Console()
 
 # Function to generate a random password
-def generate_password(length=12, specials=False):
+def generate_password(length: int = 12, specials: bool = False):
     """
     Generate a secure random password.
 

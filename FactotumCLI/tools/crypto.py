@@ -4,7 +4,7 @@ from ..logger import log_task
 console = Console()
 
 # Function to check the current price of a cryptocurrency
-def check_crypto_price(coin="bitcoin"):
+def check_crypto_price(coin: str = "bitcoin"):
     """
     Check the current price of a cryptocurrency (in CAD).
 
