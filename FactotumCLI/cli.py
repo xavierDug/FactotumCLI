@@ -8,21 +8,10 @@ from questionary import Style
 from rich.panel import Panel
 from rich.text import Text
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from FactotumCLI.config import custom_style
+from collections import defaultdict
 
 __version__ = "0.1.0"
-
-custom_style = Style([
-    ('qmark', 'fg:#00c0ff bold'),     # Question mark
-    ('question', 'bold'),             # Question text
-    ('answer', 'fg:#00c0ff bold'),    # User's answer
-    ('pointer', 'fg:#00c0ff bold'),   # Pointer for select
-    ('highlighted', 'fg:#00c0ff bold'), # Highlighted choice
-    ('selected', 'fg:#00ff00'),       # Style for a selected item
-    ('separator', 'fg:#cc5454'),
-    ('instruction', ''),              # User instructions
-    ('text', ''),                     # Plain text
-    ('disabled', 'fg:#858585 italic') # Disabled choices
-])
 
 console = Console()
 
@@ -32,11 +21,22 @@ from . import tools
 tool_functions = {}
 
 # Discover and import all tool modules
+tool_functions = {}
+tool_metadata = {}  # New: metadata storage
+
 for loader, module_name, is_pkg in pkgutil.iter_modules(tools.__path__):
     module = importlib.import_module(f"{tools.__name__}.{module_name}")
+    category = getattr(module, "CATEGORY", "Other")
+    description = getattr(module, "DESCRIPTION", "No description provided.")
+
     for attr in dir(module):
         if not attr.startswith("_") and callable(getattr(module, attr)):
-            tool_functions[attr.replace("_", "-")] = getattr(module, attr)
+            cli_name = attr.replace("_", "-")
+            tool_functions[cli_name] = getattr(module, attr)
+            tool_metadata[cli_name] = {
+                "category": category,
+                "description": description
+            }
 
 # Main function to handle command line arguments
 def main():
@@ -123,13 +123,24 @@ def run_interactive_mode():
     while True:
         console.print("\n[bold cyan]🧩 Choose a task from the menu below:[/bold cyan]\n")
 
-        choices = [
-            questionary.Choice(
-                title=f"{name} — {func.__doc__.strip().splitlines()[0] if func.__doc__ else 'No description'}",
-                value=name
-            )
-            for name, func in tool_functions.items()
-        ]
+        # Group functions by category
+        grouped_tools = defaultdict(list)
+        for name, meta in tool_metadata.items():
+            grouped_tools[meta["category"]].append(name)
+
+        choices = []
+
+        for category, tools_in_category in grouped_tools.items():
+            choices.append(questionary.Separator(f"📂 {category}"))
+            for name in tools_in_category:
+                description = tool_metadata[name]["description"]
+                choices.append(
+                    questionary.Choice(
+                        title=f"{name} — {description}",
+                        value=name
+                    )
+                )
+
         choices.append(questionary.Choice(title="❌ Exit", value="exit"))
 
         task_choice = questionary.select(
@@ -191,7 +202,11 @@ def run_interactive_mode():
             progress.add_task(description="Working on it...", total=None)
             # Pass progress to the function
             kwargs["progress"] = progress
-            selected_func(**kwargs)
+            from inspect import signature
+            sig = signature(selected_func)
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k in sig.parameters}
+
+            selected_func(**filtered_kwargs)
 
 
         console.print("\n✅ [bold green]Task completed successfully![/bold green] 🚀\n")

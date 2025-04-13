@@ -1,6 +1,9 @@
 from rich.console import Console
 from ..logger import log_task
 
+CATEGORY = "Security"
+DESCRIPTION = "Generate a secure random password."
+
 console = Console()
 
 # Function to generate a random password

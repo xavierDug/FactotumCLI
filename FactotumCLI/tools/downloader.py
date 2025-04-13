@@ -1,6 +1,9 @@
 from rich.console import Console
 from ..logger import log_task
 
+CATEGORY = "File Management"
+DESCRIPTION = "Download a webpage and save it locally."
+
 console = Console()
 
 # Function to download a webpage

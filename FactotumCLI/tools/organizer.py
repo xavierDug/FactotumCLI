@@ -1,6 +1,9 @@
 from rich.console import Console
 from ..logger import log_task
 
+CATEGORY = "File Management"
+DESCRIPTION = "Organize files in a directory by their extensions."
+
 console = Console()
 
 # Function to organize files in a directory by their extensions

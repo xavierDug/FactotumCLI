@@ -7,6 +7,10 @@ from dotenv import load_dotenv
 import os
 import time
 from FactotumCLI.logger import log_task  # adjust import based on your structure
+from FactotumCLI.config import custom_style
+
+CATEGORY = "Developer Tools"
+DESCRIPTION = "Clone and update multiple GitHub repositories."
 
 console = Console()
 
@@ -68,25 +72,56 @@ def github_repo_cloner(username: str, token: str = "", output_dir: str = "cloned
         # Track time
         start_time = time.time()
 
+        mode = questionary.select(
+            "🛠️ What would you like to do with the selected repositories?",
+            choices=[
+                "Clone only missing repositories",
+                "Pull updates for existing repositories",
+                "Both clone and pull updates"
+            ],
+            style=custom_style
+        ).ask()
+
+
         # Clone with progress
-        task = progress.add_task(description="🚀 Cloning repositories...", total=len(selected_repos))
+        task = progress.add_task(description="🚀 Processing repositories...", total=len(selected_repos))
 
         for repo_url in selected_repos:
             repo_name = repo_url.split("/")[-1].replace(".git", "")
             destination = os.path.join(output_dir, repo_name)
 
-            if os.path.exists(destination):
-                console.print(f"⚠️ Repository '{repo_name}' already exists. Skipping.", style="yellow")
-                skip_count += 1
-                progress.advance(task)
-                continue
-
             try:
-                Repo.clone_from(repo_url, destination)
-                console.print(f"✅ Cloned '{repo_name}' successfully!", style="bold green")
-                success_count += 1
+                if os.path.exists(destination):
+                    # If repo already exists
+                    if mode in ["Pull updates for existing repositories", "Both clone and pull updates"]:
+                        console.print(f"🔄 Pulling updates for '{repo_name}'...", style="bold blue")
+                        repo = Repo(destination)
+                        for remote in repo.remotes:
+                            remote.pull()
+                        console.print(f"✅ Pulled latest changes for '{repo_name}'", style="bold green")
+                        log_task(f"🔄 Pulled updates: {repo_name}")
+                        success_count += 1
+                    else:
+                        console.print(f"⚠️ Repository '{repo_name}' already exists. Skipping.", style="yellow")
+                        log_task(f"⚠️ Skipped (already exists): {repo_name}")
+                        skip_count += 1
+
+                else:
+                    # Repo doesn't exist — clone if mode allows
+                    if mode in ["Clone only missing repositories", "Both clone and pull updates"]:
+                        console.print(f"📥 Cloning '{repo_name}'...", style="bold blue")
+                        Repo.clone_from(repo_url, destination)
+                        console.print(f"✅ Cloned '{repo_name}' successfully!", style="bold green")
+                        log_task(f"✅ Cloned: {repo_name}")
+                        success_count += 1
+                    else:
+                        console.print(f"⚠️ Repository '{repo_name}' does not exist locally. Skipping.", style="yellow")
+                        log_task(f"⚠️ Skipped (missing locally): {repo_name}")
+                        skip_count += 1
+
             except Exception as e:
-                console.print(f"❌ Failed to clone '{repo_name}': {e}", style="bold red")
+                console.print(f"❌ Failed to process '{repo_name}': {e}", style="bold red")
+                log_task(f"❌ Failed to process {repo_name}: {e}")
                 fail_count += 1
 
             progress.advance(task)

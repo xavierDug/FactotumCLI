@@ -1,6 +1,9 @@
 from rich.console import Console
 from ..logger import log_task
 
+CATEGORY = "Investment"
+DESCRIPTION = "Check the current price of a cryptocurrency (in CAD)."
+
 console = Console()
 
 # Function to check the current price of a cryptocurrency
