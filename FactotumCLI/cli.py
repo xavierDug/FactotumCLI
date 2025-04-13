@@ -7,13 +7,16 @@ import questionary
 from questionary import Style
 from rich.panel import Panel
 from rich.text import Text
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+__version__ = "0.1.0"
 
 custom_style = Style([
     ('qmark', 'fg:#00c0ff bold'),     # Question mark
     ('question', 'bold'),             # Question text
-    ('answer', 'fg:#91e4ff bold'),    # User's answer
-    ('pointer', 'fg:#91e4ff bold'),   # Pointer for select
-    ('highlighted', 'fg:#91e4ff bold'), # Highlighted choice
+    ('answer', 'fg:#00c0ff bold'),    # User's answer
+    ('pointer', 'fg:#00c0ff bold'),   # Pointer for select
+    ('highlighted', 'fg:#00c0ff bold'), # Highlighted choice
     ('selected', 'fg:#00ff00'),       # Style for a selected item
     ('separator', 'fg:#cc5454'),
     ('instruction', ''),              # User instructions
@@ -111,85 +114,94 @@ def run_interactive_mode():
 ╚═╝     ╚═╝  ╚═╝ ╚═════╝   ╚═╝    ╚═════╝    ╚═╝    ╚═════╝ ╚═╝     ╚═╝
 \n""")
     splash_text.append("Welcome to ", style="bold")
-    splash_text.append("FactotumCLI", style="bold magenta")
+    splash_text.append(f"FactotumCLI v{__version__}", style="bold magenta")
     splash_text.append(" 🎩\n", style="bold")
     splash_text.append("Your personal terminal assistant.\n", style="bold cyan")
 
     console.print(Panel(splash_text, style="bold blue"))
 
-    console.print("\n[bold cyan]🧩 Choose a task from the menu below:[/bold cyan]\n")
-    
-    # List all available functions
-    choices = [
-        questionary.Choice(
-            title=f"{name} — {func.__doc__.strip().splitlines()[0] if func.__doc__ else 'No description'}",
-            value=name
-        )
-        for name, func in tool_functions.items()
-    ]
+    while True:
+        console.print("\n[bold cyan]🧩 Choose a task from the menu below:[/bold cyan]\n")
 
+        choices = [
+            questionary.Choice(
+                title=f"{name} — {func.__doc__.strip().splitlines()[0] if func.__doc__ else 'No description'}",
+                value=name
+            )
+            for name, func in tool_functions.items()
+        ]
+        choices.append(questionary.Choice(title="❌ Exit", value="exit"))
 
-    task_choice = questionary.select(
-        "",
-        choices=choices,
-        style=custom_style
-    ).ask()
-
-    if not task_choice:
-        console.print("❌ No task selected. Exiting.", style="bold red")
-        return
-
-    selected_func = tool_functions[task_choice]
-
-    # Get function parameters dynamically
-    from inspect import signature
-
-    params = signature(selected_func).parameters
-    kwargs = {}
-
-    for param_name, param in params.items():
-        param_type = param.annotation if param.annotation != param.empty else str
-        default_value = param.default if param.default != param.empty else None
-
-        question_text = f"Enter value for '{param_name}'"
-        if default_value is not None:
-            question_text += f" (default: {default_value})"
-
-        answer = questionary.text(
-            question_text + ":",
-            default=str(default_value) if default_value is not None else "",
-            style=custom_style,
+        task_choice = questionary.select(
+            "",
+            choices=choices,
+            style=custom_style
         ).ask()
 
-        # If user leaves it blank, use default
-        if not answer and default_value is not None:
-            kwargs[param_name] = default_value
-            continue
+        if task_choice == "exit" or task_choice is None:
+            graceful_exit(console)
+            break
 
-        # Convert the answer to the correct type
-        try:
-            if param_type == bool:
-                answer = answer.lower() in ["yes", "y", "true", "1"]
-            else:
-                answer = param_type(answer)
-            kwargs[param_name] = answer
-        except ValueError:
-            console.print(f"❌ Invalid input for parameter '{param_name}'. Expected {param_type.__name__}.", style="bold red")
-            return  # Exit early on invalid input
+        selected_func = tool_functions[task_choice]
+
+        from inspect import signature
+
+        params = signature(selected_func).parameters
+        kwargs = {}
+
+        internal_params = {"progress"}
+
+        for param_name, param in params.items():
+            if param_name in internal_params:
+                continue  # Skip internal-use parameters
+
+            param_type = param.annotation if param.annotation != param.empty else str
+            default_value = param.default if param.default != param.empty else None
+
+            question_text = f"Enter value for '{param_name}'"
+            if default_value is not None:
+                question_text += f" (default: {default_value})"
+
+            answer = questionary.text(
+                question_text + ":",
+                default=str(default_value) if default_value is not None else "",
+                style=custom_style
+            ).ask()
+
+            if not answer and default_value is not None:
+                kwargs[param_name] = default_value
+                continue
+
+            try:
+                if param_type == bool:
+                    answer = answer.lower() in ["yes", "y", "true", "1"]
+                else:
+                    answer = param_type(answer)
+                kwargs[param_name] = answer
+            except ValueError:
+                console.print(f"❌ Invalid input for parameter '{param_name}'. Expected {param_type.__name__}.", style="bold red")
+                return
+
+        # Progress bar wrapper
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            transient=True,
+        ) as progress:
+            progress.add_task(description="Working on it...", total=None)
+            # Pass progress to the function
+            kwargs["progress"] = progress
+            selected_func(**kwargs)
 
 
-    from rich.progress import Progress, SpinnerColumn, TextColumn
+        console.print("\n✅ [bold green]Task completed successfully![/bold green] 🚀\n")
 
-    console.print(f"\n🚀 [bold cyan]Running task:[/bold cyan] [green]{task_choice}[/green]\n")
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        transient=True,
-    ) as progress:
-        progress.add_task(description="Working on it...", total=None)
-        selected_func(**kwargs)
-
-    console.print("\n✅ [bold green]Task completed successfully![/bold green] 🚀\n")
+        # Ask to run another task
+        another = questionary.confirm("Would you like to run another task?", style=custom_style).ask()
+        if not another:
+            graceful_exit(console)
+            break
 
 
+def graceful_exit(console):
+    console.print("\n[bold magenta]Thank you for using FactotumCLI! Goodbye! 👋[/bold magenta]\n")
